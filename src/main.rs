@@ -1,29 +1,21 @@
-use axum::{debug_handler, routing::get, Json, Router};
-use serde::{Deserialize, Serialize};
+use axum::{
+    routing::{get, post},
+    Router,
+};
+
+use crate::todo::{todo_list, todo_post};
+
+mod todo;
 
 #[tokio::main]
 async fn main() {
-    let app = Router::new().route("/", get(todo_get));
+    let router = Router::new()
+        .route("/todos", get(todo_list))
+        .route("/todos", post(todo_post));
 
     let addr = "0.0.0.0:3000";
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
 
     println!("Listening on http://{}", addr);
-    axum::serve(listener, app).await.unwrap();
-}
-
-#[derive(Serialize, Deserialize)]
-struct TodoItem {
-    id: u32,
-    title: String,
-    completed: bool,
-}
-
-#[debug_handler]
-async fn todo_get() -> Json<TodoItem> {
-    Json::from(TodoItem {
-        id: 1,
-        title: "Learn Rust".to_string(),
-        completed: false,
-    })
+    axum::serve(listener, router).await.unwrap();
 }

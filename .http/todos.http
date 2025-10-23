@@ -1,0 +1,39 @@
+@id = 6e7973d3-3898-4d40-be56-5fc854e4e1ea
+
+###
+
+
+# @name todo.list
+# @description get all todos
+GET http://localhost:3000/todos
+
+
+# @name todo.create
+# @description create a new todo
+POST http://localhost:3000/todos
+Content-Type: application/json
+
+{
+    "title": "New Todo",
+    "completed": false
+}
+
+
+# @name todo.get
+# @description get a todo by id
+GET http://localhost:3000/todos/{{id}}
+
+
+# @name todo.update
+# @description update a todo by id
+PATCH http://localhost:3000/todos/{{id}}
+Content-Type: application/json
+
+{
+    "completed": false
+}
+
+
+# @name todo.delete
+# @description delete a todo by id
+DELETE http://localhost:3000/todos/{{id}}

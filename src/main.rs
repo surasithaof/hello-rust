@@ -1,17 +1,11 @@
-use axum::{
-    routing::{get, post},
-    Router,
-};
-
-use crate::todo::{todo_list, todo_post};
+use axum::Router;
 
 mod todo;
 
 #[tokio::main]
 async fn main() {
-    let router = Router::new()
-        .route("/todos", get(todo_list))
-        .route("/todos", post(todo_post));
+    let router = Router::new();
+    let router = router.merge(todo::init_router());
 
     let addr = "0.0.0.0:3000";
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();

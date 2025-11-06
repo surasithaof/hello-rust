@@ -1,15 +1,9 @@
 use axum::{response::Html, routing::get, Router};
 use tokio::fs;
 
-pub fn serve_openapi_html() -> Router {
+pub fn openapi_preview() -> Router {
     Router::new()
-        .route(
-            "/api-docs",
-            get(|| async {
-                let content = generate_scalar_html();
-                Html(content)
-            }),
-        )
+        .route("/api-docs", get(|| async { Html(generate_scalar_html()) }))
         .route(
             "/api-docs/spec",
             get(|| async { fs::read_to_string("./docs/openapi.yaml").await.unwrap() }),

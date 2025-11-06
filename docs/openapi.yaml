@@ -1,0 +1,206 @@
+openapi: 3.1.1
+info:
+  title: Hello Rust API
+  description: This is a sample API for Todo application built with Rust.
+  version: 1.0.0
+  contact:
+    name: API Support
+    url: http://www.example.com/support
+    email: support@example.com
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+
+tags:
+  - name: Todos
+    description: Operations related to todo items
+
+paths:
+  /todos:
+    get:
+      tags: [Todos]
+      operationId: todos.list
+      summary: Get all todos
+      description: Retrieve a list of all todo items.
+      responses:
+        "200":
+          description: A list of todos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoPage"
+    post:
+      tags: [Todos]
+      operationId: todos.create
+      summary: Create a new todo
+      description: Create a new todo item with the provided details.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewTodo"
+      responses:
+        "201":
+          description: The created todo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Todo"
+        "400":
+          description: Invalid input
+
+  /todos/{id}:
+    get:
+      tags: [Todos]
+      operationId: todos.get
+      summary: Get a todo by ID
+      description: Retrieve a single todo item by its ID.
+      parameters:
+        - in: path
+          description: The ID of the todo to retrieve
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: A single todo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Todo"
+        "404":
+          description: Todo not found
+
+    put:
+      tags: [Todos]
+      operationId: todos.update
+      summary: Update a todo by ID
+      description: Update the details of an existing todo item by its ID.
+      parameters:
+        - $ref: "#/components/parameters/PathTodoId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTodo"
+      responses:
+        "200":
+          description: The updated todo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Todo"
+        "400":
+          description: Invalid input
+        "404":
+          description: Todo not found
+        "500":
+          description: Internal server error
+    delete:
+      tags: [Todos]
+      operationId: todos.delete
+      summary: Delete a todo by ID
+      description: Delete an existing todo item by its ID.
+      parameters:
+        - $ref: "#/components/parameters/PathTodoId"
+      responses:
+        "204":
+          description: Todo deleted successfully
+        "404":
+          description: Todo not found
+        "500":
+          description: Internal server error
+
+components:
+  parameters:
+    PathTodoId:
+      name: id
+      in: path
+      description: The ID of the todo
+      required: true
+      schema:
+        type: integer
+
+  schemas:
+    TimeStamp:
+      type: string
+      format: date-time
+      description: A timestamp in RFC 3339 format
+      example: "2023-10-05T14:48:00.000Z"
+
+    Audit:
+      type: object
+      description: Common audit fields for created and updated timestamps
+      properties:
+        createdAt:
+          description: The timestamp when the item was created
+          $ref: "#/components/schemas/TimeStamp"
+        updatedAt:
+          description: The timestamp when the item was last updated
+          $ref: "#/components/schemas/TimeStamp"
+
+    NewTodo:
+      description: Schema for creating a new todo item
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          description: The title of the todo item
+          example: Buy groceries
+        description:
+          type: string
+          description: A detailed description of the todo item
+          example: Milk, Bread, Eggs, and Fruits
+
+    UpdateTodo:
+      description: Schema for updating an existing todo item
+      allOf:
+        - $ref: "#/components/schemas/NewTodo"
+        - type: object
+          required: []
+      properties:
+        completed:
+          type: boolean
+          description: Indicates whether the todo item is completed
+          default: false
+          example: false
+
+    Todo:
+      type: object
+      description: Schema representing a todo item
+      required:
+        - id
+        - title
+        - completed
+        - createdAt
+        - updatedAt
+      allOf:
+        - $ref: "#/components/schemas/NewTodo"
+        - $ref: "#/components/schemas/UpdateTodo"
+        - $ref: "#/components/schemas/Audit"
+        - type: object
+      properties:
+        id:
+          type: integer
+          description: The unique identifier of the todo item
+          example: 1
+
+    TodoPage:
+      type: object
+      description: A list of todo items with total count
+      properties:
+        total:
+          type: integer
+          description: Total number of todo items
+          example: 42
+        items:
+          type: array
+          description: List of todo items
+          items:
+            $ref: "#/components/schemas/Todo"

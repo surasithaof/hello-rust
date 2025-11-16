@@ -1,7 +1,7 @@
 use axum::{
     debug_handler,
     extract::{Path, State},
-    http::{header, StatusCode},
+    http::{header, HeaderMap, StatusCode},
     response::IntoResponse,
     routing::{delete, get, patch, post},
     Json, Router,
@@ -12,13 +12,49 @@ use serde::{Deserialize, Serialize};
 use std::{sync::Arc, time::SystemTime};
 use tokio::sync::Mutex;
 
+// TODO: move to shared module
+#[derive(Serialize, Deserialize, Clone)]
+struct Audit {
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+impl Audit {
+    fn new() -> Self {
+        let now = Utc::now();
+        Self {
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    fn touch(&mut self) {
+        self.updated_at = Utc::now();
+    }
+
+    fn last_modified(&self) -> String {
+        let system_time: SystemTime = self.updated_at.into();
+        let http_date: HttpDate = system_time.into();
+        http_date.to_string()
+    }
+
+    fn etag(&self) -> String {
+        let system_time: SystemTime = self.updated_at.into();
+        let duration = system_time
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        format!("{duration}")
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct TodoItem {
     id: Option<String>,
     title: String,
     completed: bool,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    #[serde(flatten)]
+    audit: Audit,
 }
 
 // NOTE: In a real application, use proper synchronization (e.g., Mutex) for shared state.
@@ -58,13 +94,11 @@ async fn create_handler(
     State(store): State<TodoStore>,
     Json(new_item): Json<CreateTodoItem>,
 ) -> impl IntoResponse {
-    let now = Utc::now();
     let item = TodoItem {
         id: Some(uuid::Uuid::new_v4().to_string()),
         title: new_item.title.clone(),
         completed: new_item.completed,
-        created_at: now,
-        updated_at: now,
+        audit: Audit::new(),
     };
 
     store.lock().await.push(item.clone());
@@ -83,17 +117,11 @@ async fn get_handler(State(store): State<TodoStore>, Path(id): Path<String>) -> 
     let item = items.iter().find(|item| item.id.as_ref() == Some(&id));
 
     if let Some(item) = item {
-        // format the SystemTime as HTTP date
-        let last_modified: HttpDate = SystemTime::from(item.updated_at).into();
-        let etag = SystemTime::from(item.updated_at)
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
         IntoResponse::into_response((
             StatusCode::OK,
             [
-                (header::LAST_MODIFIED, last_modified.to_string().as_str()),
-                (header::ETAG, format!("{etag}").as_str()),
+                (header::LAST_MODIFIED, item.audit.last_modified().as_str()),
+                (header::ETAG, item.audit.etag().as_str()),
             ],
             Json(item.clone()),
         ))
@@ -110,20 +138,27 @@ pub struct PatchTodoItem {
 
 #[debug_handler]
 async fn patch_handler(
+    headers: HeaderMap,
     State(store): State<TodoStore>,
     Path(id): Path<String>,
     Json(update): Json<PatchTodoItem>,
 ) -> Result<Json<TodoItem>, StatusCode> {
-    // TODO: check if header If-Match or If-Unmodified-Since matches
-
     let mut items = store.lock().await;
     if let Some(item) = items.iter_mut().find(|item| item.id.as_ref() == Some(&id)) {
+        if let Some(etag) = headers.get(header::IF_MATCH) {
+            let etag_str = etag.to_str().map_err(|_| StatusCode::BAD_REQUEST)?;
+            if etag_str != item.audit.etag() {
+                return Err(StatusCode::PRECONDITION_FAILED);
+            }
+        }
+
         if let Some(title) = update.title {
             item.title = title.clone();
         }
         if let Some(completed) = update.completed {
             item.completed = completed;
         }
+        item.audit.touch();
         Ok(Json(item.clone()))
     } else {
         Err(StatusCode::NOT_FOUND)

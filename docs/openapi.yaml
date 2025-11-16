@@ -30,6 +30,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TodoPage"
+
     post:
       tags: [Todos]
       operationId: todos.create
@@ -43,6 +44,11 @@ paths:
               $ref: "#/components/schemas/NewTodo"
       responses:
         "201":
+          headers:
+            Location:
+              description: The URL of the created todo
+              schema:
+                type: string
           description: The created todo
           content:
             application/json:
@@ -66,6 +72,16 @@ paths:
             type: integer
       responses:
         "200":
+          headers:
+            ETag:
+              description: The entity tag of the resource
+              schema:
+                type: string
+            Last-Modified:
+              description: The last modified timestamp of the resource
+              schema:
+                type: string
+                format: date-time
           description: A single todo
           content:
             application/json:
@@ -81,6 +97,12 @@ paths:
       description: Update the details of an existing todo item by its ID.
       parameters:
         - $ref: "#/components/parameters/PathTodoId"
+        - name: If-Match
+          in: header
+          description: The ETag value to ensure the resource has not been modified
+          required: false
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -100,6 +122,7 @@ paths:
           description: Todo not found
         "500":
           description: Internal server error
+
     delete:
       tags: [Todos]
       operationId: todos.delete

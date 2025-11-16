@@ -161,6 +161,7 @@ name = "hello-rust"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "httpdate",
  "serde",
  "serde_json",
  "tokio",

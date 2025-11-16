@@ -6,9 +6,10 @@ use axum::{
     routing::{delete, get, patch, post},
     Json, Router,
 };
+use chrono::{DateTime, Utc};
 use httpdate::HttpDate;
 use serde::{Deserialize, Serialize};
-use std::{sync::Arc, time};
+use std::{sync::Arc, time::SystemTime};
 use tokio::sync::Mutex;
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -16,8 +17,8 @@ pub struct TodoItem {
     id: Option<String>,
     title: String,
     completed: bool,
-    created_at: time::SystemTime,
-    updated_at: time::SystemTime,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
 }
 
 // NOTE: In a real application, use proper synchronization (e.g., Mutex) for shared state.
@@ -57,12 +58,13 @@ async fn create_handler(
     State(store): State<TodoStore>,
     Json(new_item): Json<CreateTodoItem>,
 ) -> impl IntoResponse {
+    let now = Utc::now();
     let item = TodoItem {
         id: Some(uuid::Uuid::new_v4().to_string()),
         title: new_item.title.clone(),
         completed: new_item.completed,
-        created_at: time::SystemTime::now(),
-        updated_at: time::SystemTime::now(),
+        created_at: now,
+        updated_at: now,
     };
 
     store.lock().await.push(item.clone());
@@ -82,10 +84,9 @@ async fn get_handler(State(store): State<TodoStore>, Path(id): Path<String>) -> 
 
     if let Some(item) = item {
         // format the SystemTime as HTTP date
-        let last_modified: HttpDate = item.updated_at.into();
-        let etag = item
-            .updated_at
-            .duration_since(time::UNIX_EPOCH)
+        let last_modified: HttpDate = SystemTime::from(item.updated_at).into();
+        let etag = SystemTime::from(item.updated_at)
+            .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
         IntoResponse::into_response((
